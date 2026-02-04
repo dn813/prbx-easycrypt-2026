@@ -1,27 +1,36 @@
 require import AllCore List Int Bool Distr.
 
-type pk.
-type sk.
-type pk_list = pk list.
-type sk_list = sk list.
-type pc.
-type sc.
-type group.
-type secparam.
-type voter = int.
-type cnd.
-type votes = int distr.
-type cs = cnd list.
-type ring.
+(* Types *)
+type pkey. (* public encryption key *)
+type skey. (* private encryption key *)
+type pcred. (* public credential *)
+type scred. (* private credential *)
+type rand. (* random for encryption *)
+type gen. (* key generator *)
+type secparam. (* security param *)
+type voter = int. (* each voter is an index i in V_i *)
+type cnd.  (* candidate *)
+type vote.
+type cs = cnd list.  (* candidate selection *)
+type ring. (* LRS ring *)
 type event.
-type ballot.
-type bb.
-type nizk.
-type result = int list.
+type ballot. (* encrypted vote *)
+type bb = ballot list. (* bulletin board *)
+type nizk. (* NIZK proof object *)
+type result = vote list. (* final election result *)
 
-op setup: secparam -> pk * pk_list * sk_list.
-op register: voter -> pc * sc.
+(* Operations *)
+op setup: secparam -> pkey * pkey list * skey list.
+op register: voter -> pcred * scred.
 
+(* Distributions *)
+op [lossless uniform full] drand: rand distr.
+
+
+module GlobVar = {
+  var bb: bb
+  var elec_result: result
+}.
 
 
 module type VS = {
@@ -50,11 +59,12 @@ module VotingScheme : VS = {
   }
 
   proc register(i: voter): pc * sc = {
-    var pc:
-     register(i);
+    return register(i);
   }
 
-  proc setupelection()
+  proc setupelection(): ring * cs * event = {
+    
+  }
 }.
 
 module Adversary : Adv = {
@@ -67,7 +77,7 @@ module Adversary : Adv = {
   }
   proc guess(vj: voter): bool = {
     var guess: bool;
-    guess <$ [false..true];
+    guess <$ {0,1};
   }
 }.
 
