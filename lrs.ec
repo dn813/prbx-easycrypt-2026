@@ -13,23 +13,24 @@ import G GP.
 theory LRSTypes.
   type pkey = group. (* public encryption key *)
   type skey = exp. (* private encryption key *)
+  type tag = group.
   type pcred = group * group. (* public credential/signature *)
   type scred = exp * exp * exp. (* private credential/signature *)
-  type sig. (* Signature *)
+  type sig = exp * exp list * exp list * exp list * tag. (* Signature *)
   type generator = group. (* Group generator *)
   type ring.
 
-  type string.
+  type string = pcred list * tag * group * group * group * group.
   type event = string.
-  type tag = group.
 
   type ptxt. (* Plaintext *)
   type ctxt. (* Ciphertext *)
 
-  op encode_group: group -> string.
-  op encode_exp: exp -> string.z
   op H_G: string -> group.
   op H_q: string -> exp.
+
+  op ( * ): exp -> exp -> exp.
+  op ( - ): exp -> exp -> exp.
 
   op [lossless uniform full] dgroup: group distr.
   op [lossless uniform full] dexp: exp distr.
@@ -74,13 +75,24 @@ module LRS : LinkableRingSS = {
     return (pc, sc);
   }
 
-  proc sign(L: pcred list, ev: event, sc_i: scred, m: group): sig = {
+  proc sign(L: pcred list, ev: event, sc_i: scred, i: int, m: group): sig = {
     var e: group;
     var t: tag;
+ 
     var xi, yi, ri;
-    var alp, bet, gam, c;
+    var alp, bet, gam, c, c1;
     var ki, ki', ki'';
+    var j: int;
 
+    var cred_j: pcred;
+    var cred_j1, cred_j2: group;
+    var default_pcred;
+    var kj, kj', kj'';
+
+    var sj, tj, pj: exp;
+    var si, ti, pi: exp;
+    var ss, ts, ps: exp list;
+    
     xi <- sc_i .` 1;
     yi <- sc_i .` 2;
     ri <- sc_i .` 3;
@@ -95,6 +107,35 @@ module LRS : LinkableRingSS = {
     ki <- g ^ alp * h ^ gam * pk ^ bet;
     ki' <- g ^ bet;
     ki'' <- e ^ alp;
-    c <- H_q();
+    c <- H_q(L, t, ki, ki', ki'', m);
+
+    j <- i + 1;
+    while (j <> i) {
+      if (j = 1) {c1 <- c;}
+      cred_j <- nth default_pcred L j;
+      cred_j1 <- cred_j .` 1;
+      cred_j2 <- cred_j .` 2;
+        
+      sj <$ dexp;
+      tj <$ dexp;
+      pj <$ dexp;
+      ss <- ss ++ [sj];
+      ts <- ts ++ [tj];
+      ps <- ps ++ [pj];
+      
+      kj <- g ^ tj * h ^ pj * pk ^ sj * cred_j2 ^ c;          kj' <- g ^ sj * cred_j1 ^ c;
+      kj'' <- e ^ tj * t ^ c;
+      c <- H_q(L, t, kj, kj', kj'', m);
+      j <- j + 1;
+      if (j = size(L) + 1) {j <- 1;}
+    }
+    si <- bet - (c * ri);
+    ti <- alp - (c * xi);
+    pi <- gam - (c * yi);
+    ss <- ss ++ [si];
+    ts <- ts ++ [ti];
+    ps <- ps ++ [pi];
+    
+    return (c1, ss, ts, ps, t);
   }
 }.
