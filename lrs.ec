@@ -23,8 +23,7 @@ theory LRSTypes.
   type string = pcred list * tag * group * group * group * group.
   type event = string.
 
-  type ptxt. (* Plaintext *)
-  type ctxt. (* Ciphertext *)
+  type ptxt = group. (* Plaintext *)
 
   op H_G: string -> group.
   op H_q: string -> exp.
@@ -42,7 +41,7 @@ export LRSTypes.
 module type LinkableRingSS = {
   proc setup(): generator * generator * (string -> group) * (string -> exp) * pkey
   proc kgen(): pcred * scred
-  proc sign(L: pcred list, ev: event, sc: scred, m: group): sig
+  proc sign(L: pcred list, ev: event, sc: scred, m: ptxt): sig
   proc verify(L: ring, ev: event, m: ptxt, s: sig): bool
   proc link(s1: sig, s2: sig): bool
 }.
@@ -75,13 +74,14 @@ module LRS : LinkableRingSS = {
     return (pc, sc);
   }
 
-  proc sign(L: pcred list, ev: event, sc_i: scred, i: int, m: group): sig = {
+  proc sign(L: pcred list, ev: event, sc_i: scred, m: ptxt): sig = {
     var e: group;
     var t: tag;
  
     var xi, yi, ri;
     var alp, bet, gam, c, c1;
     var ki, ki', ki'';
+    var i: int;
     var j: int;
 
     var cred_j: pcred;
@@ -119,9 +119,16 @@ module LRS : LinkableRingSS = {
       sj <$ dexp;
       tj <$ dexp;
       pj <$ dexp;
-      ss <- ss ++ [sj];
-      ts <- ts ++ [tj];
-      ps <- ps ++ [pj];
+      if (i < j) {
+        ss <- ss ++ [sj];
+        ts <- ts ++ [tj];
+        ps <- ps ++ [pj];
+      }
+      else {
+        ss <- [sj] ++ ss;
+        ts <- [tj] ++ ts;
+        ps <- [pj] ++ ps;
+      }
       
       kj <- g ^ tj * h ^ pj * pk ^ sj * cred_j2 ^ c;          kj' <- g ^ sj * cred_j1 ^ c;
       kj'' <- e ^ tj * t ^ c;
@@ -137,5 +144,22 @@ module LRS : LinkableRingSS = {
     ps <- ps ++ [pi];
     
     return (c1, ss, ts, ps, t);
+  }
+
+  proc verify(L: pcred list, ev: event, m: ptxt, sig: sig): bool = {
+    var e, v: group;
+    var j: int;
+    var result;
+
+    var kj, kj', kj'';
+    
+    e <- H_G(ev);
+    j <- 1;
+    while (j < size(L)) {
+      kj <- g ^ tj * h ^ pj * pk ^ sj * cred_j2 ^ c;
+      kj' <- g ^ sj * cred_j1 ^ c;
+      kj'' <- e ^ tj * t ^ c;
+      c <- H_q(L, t, kj, kj', kj'', v);
+    }
   }
 }.
