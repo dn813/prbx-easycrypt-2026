@@ -1,19 +1,10 @@
 require import AllCore List Int Bool Distr.
+(* require import Lrs. *)
 
 (* Types *)
-type pkey. (* public encryption key *)
-type skey. (* private encryption key *)
-type pcred. (* public credential *)
-type scred. (* private credential *)
-type rand. (* random for encryption *)
-type gen. (* key generator *)
-type secparam. (* security param *)
-type voter = int. (* each voter is an index i in V_i *)
 type cnd.  (* candidate *)
 type vote.
 type cs = cnd list.  (* candidate selection *)
-type ring. (* LRS ring *)
-type event.
 type ballot. (* encrypted vote *)
 type bb = ballot list. (* bulletin board *)
 type nizk. (* NIZK proof object *)
