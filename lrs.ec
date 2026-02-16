@@ -42,7 +42,7 @@ module type LinkableRingSS = {
   proc setup(): generator * generator * (string -> group) * (string -> exp) * pkey
   proc kgen(): pcred * scred
   proc sign(L: pcred list, ev: event, sc: scred, m: ptxt): sig
-  proc verify(L: ring, ev: event, m: ptxt, s: sig): bool
+  proc verify(L: pcred list, ev: event, m: ptxt, s: sig): bool
   proc link(s1: sig, s2: sig): bool
 }.
 
@@ -79,7 +79,7 @@ module LRS : LinkableRingSS = {
     var t: tag;
  
     var xi, yi, ri;
-    var alp, bet, gam, c, c1;
+    var alp, bet, gam, c, c1: exp;
     var ki, ki', ki'';
     var i: int;
     var j: int;
@@ -109,8 +109,8 @@ module LRS : LinkableRingSS = {
     ki'' <- e ^ alp;
     c <- H_q(L, t, ki, ki', ki'', m);
 
-    j <- i + 1;
-    while (j <> i) {
+    j <- 1;
+    while (j < size(L) + 1) {
       if (j = 1) {c1 <- c;}
       cred_j <- nth default_pcred L j;
       cred_j1 <- cred_j .` 1;
@@ -130,36 +130,58 @@ module LRS : LinkableRingSS = {
         ps <- [pj] ++ ps;
       }
       
-      kj <- g ^ tj * h ^ pj * pk ^ sj * cred_j2 ^ c;          kj' <- g ^ sj * cred_j1 ^ c;
+      kj <- g ^ tj * h ^ pj * pk ^ sj * cred_j2 ^ c;
+      kj' <- g ^ sj * cred_j1 ^ c;
       kj'' <- e ^ tj * t ^ c;
       c <- H_q(L, t, kj, kj', kj'', m);
       j <- j + 1;
-      if (j = size(L) + 1) {j <- 1;}
     }
     si <- bet - (c * ri);
     ti <- alp - (c * xi);
     pi <- gam - (c * yi);
-    ss <- ss ++ [si];
-    ts <- ts ++ [ti];
-    ps <- ps ++ [pi];
+    ss <- put ss i si;
+    ts <- put ts i ti;
+    ps <- put ps i pi;
     
     return (c1, ss, ts, ps, t);
   }
 
   proc verify(L: pcred list, ev: event, m: ptxt, sig: sig): bool = {
-    var e, v: group;
-    var j: int;
-    var result;
-
-    var kj, kj', kj'';
+    var c1, c: exp;
+    var ss, ts, ps: exp list;
+    var t: tag;
     
+    var e: group;
+    var j: int;
+    var sj, tj, pj: exp;
+    
+    var cred_j: pcred;
+    var cred_j1, cred_j2: group;
+    var default_pcred;
+    var kj, kj', kj'';
+
+    var result: bool;
+    result <- false;
+
+    c1 <- sig .` 1;
+    ss <- sig .` 2;
+    ts <- sig .` 3;
+    ps <- sig .` 4;
+    t <- sig .` 5;
     e <- H_G(ev);
+    
     j <- 1;
     while (j < size(L)) {
+      cred_j <- nth default_pcred L j;
+      cred_j1 <- cred_j .` 1;
+      cred_j2 <- cred_j .` 2;
+
       kj <- g ^ tj * h ^ pj * pk ^ sj * cred_j2 ^ c;
       kj' <- g ^ sj * cred_j1 ^ c;
       kj'' <- e ^ tj * t ^ c;
-      c <- H_q(L, t, kj, kj', kj'', v);
+      c <- H_q(L, t, kj, kj', kj'', m);
     }
+    if(c1 = c) {result <- true;}
+    return result;
   }
 }.
