@@ -41,7 +41,7 @@ export LRSTypes.
 module type LinkableRingSS = {
   proc setup(): generator * generator * (string -> group) * (string -> exp) * pkey
   proc kgen(): pcred * scred
-  proc sign(L: pcred list, ev: event, sc: scred, m: ptxt): sig
+  proc sign(L: pcred list, ev: event, i: int, sc_i: scred, m: ptxt): sig
   proc verify(L: pcred list, ev: event, m: ptxt, s: sig): bool
   proc link(s1: sig, s2: sig): bool
 }.
@@ -49,6 +49,7 @@ module type LinkableRingSS = {
 module LRS : LinkableRingSS = {
   var g, h: generator
   var pk: pkey
+  var i: int
   proc setup(): generator * generator * (string -> group) * (string -> exp) * pkey = {
     var sk: skey;
 
@@ -81,7 +82,6 @@ module LRS : LinkableRingSS = {
     var xi, yi, ri;
     var alp, bet, gam, c, c1: exp;
     var ki, ki', ki'';
-    var i: int;
     var j: int;
 
     var cred_j: pcred;
@@ -108,7 +108,14 @@ module LRS : LinkableRingSS = {
     ki' <- g ^ bet;
     ki'' <- e ^ alp;
     c <- H_q(L, t, ki, ki', ki'', m);
-
+    (* Initially set c1 to c, will be overwriten later *)
+    c1 <- c;
+    
+    (* Initialise lists *)
+    ss <- [];
+    ts <- [];
+    ps <- [];
+    
     j <- 1;
     while (j < size(L) + 1) {
       if (j = 1) {c1 <- c;}
@@ -163,6 +170,11 @@ module LRS : LinkableRingSS = {
     var result: bool;
     result <- false;
 
+    (* Initialise to random values *)
+    sj <$ dexp;
+    tj <$ dexp;
+    pj <$ dexp;
+    
     c1 <- sig .` 1;
     ss <- sig .` 2;
     ts <- sig .` 3;
@@ -171,6 +183,7 @@ module LRS : LinkableRingSS = {
     e <- H_G(ev);
     
     j <- 1;
+    c <- c1;
     while (j < size(L)) {
       cred_j <- nth default_pcred L j;
       cred_j1 <- cred_j .` 1;
@@ -182,6 +195,15 @@ module LRS : LinkableRingSS = {
       c <- H_q(L, t, kj, kj', kj'', m);
     }
     if(c1 = c) {result <- true;}
+    return result;
+  }
+
+  proc link(s1: sig, s2: sig): bool = {
+    var t1, t2;
+    var result: bool <- false;
+    t1 <- s1 .` 5;
+    t2 <- s2 .` 5;
+    if (t1 = t2) {result <- true;}
     return result;
   }
 }.
