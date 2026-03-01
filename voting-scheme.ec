@@ -1,37 +1,32 @@
-require import AllCore List Int Bool Distr.
-(* require import Lrs. *)
+require import AllCore List IntDiv Bool Distr.
+require import Lrs.
 
 (* Types *)
 type cnd.  (* candidate *)
 type vote.
+type voter.
 type cs = cnd list.  (* candidate selection *)
 type ballot. (* encrypted vote *)
 type bb = ballot list. (* bulletin board *)
 type nizk. (* NIZK proof object *)
 type result = vote list. (* final election result *)
 
+type group = Lrs.G.group.
+type exp = Lrs.exp.
+
 (* Operations *)
-op setup: secparam -> pkey * pkey list * skey list.
-op register: voter -> pcred * scred.
 
 (* Distributions *)
-op [lossless uniform full] drand: rand distr.
-
-
-module GlobVar = {
-  var bb: bb
-  var elec_result: result
-}.
 
 
 module type VS = {
-  proc setup(l: secparam): pk * pk_list * sk_list
-  proc register(i: voter): pc * sc
+  proc setup(ta_count: int): unit
+  proc register(i: voter): pcred * scred
   proc setupelection(): ring * cs * event
-  proc vote(cnd: cnd, sc_i: sc, i: voter): ballot
+  proc vote(cnd: cnd, sc_i: scred, i: voter): ballot
   proc isvalid(b: ballot, bb: bb): bool
   proc shuffle(bb: bb): nizk
-  proc tally(sk: sk, bb: bb): result * nizk
+  proc tally(sk: skey, bb: bb): result * nizk
   proc verify(bb: bb, t: result, pi: nizk): bool
 }.
 
@@ -41,20 +36,33 @@ module type Adv = {
 }.
 
 module type BB = {
-  proc registerkey(pk: pk, pk_ta: pk): unit
+  proc registerkey(pk: pkey, pk_ta: pkey): unit
 }.
 
 module VotingScheme : VS = {
-  proc setup(l: secparam): pk * pk_list * sk_list = {
-    return setup(l);
+  proc setup(ta_count: int): unit = {
+    var params;
+    var sk_ta: skey list <- [];
+    var sk_ta_i: exp;
+    var ta_i: int <- 0;
+    params <@ LRS.setup();
+
+    while (ta_i < ta_count) {
+      sk_ta_i <$ dexp;
+      sk_ta <- ta_sk ++ [sk_ta_i];
+      ta_i <- ta_i + 1;
+    }
+
+    BB.registerkey();
+  }
+  
+  proc setupelection(): ring * cs * event = {
+    var ev: event;
+    ev <- H_G();
   }
 
   proc register(i: voter): pc * sc = {
     return register(i);
-  }
-
-  proc setupelection(): ring * cs * event = {
-    
   }
 }.
 

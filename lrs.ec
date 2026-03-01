@@ -1,13 +1,10 @@
-require import AllCore List Bool Ring IntDiv.
+require import AllCore List Bool IntDiv.
 require (****) Group.
 
 clone Group.CyclicGroup as G.
-
 axiom prime_p : prime G.order.
-  
 clone G.PowZMod as GP with
   lemma prime_order <- prime_p.
-
 import G GP.
 
 theory LRSTypes.
@@ -41,7 +38,7 @@ export LRSTypes.
 module type LinkableRingSS = {
   proc setup(): generator * generator * (string -> group) * (string -> exp) * pkey
   proc kgen(): pcred * scred
-  proc sign(L: pcred list, ev: event, i: int, sc_i: scred, m: ptxt): sig
+  proc sign(L: pcred list, ev: event, sc_i: scred, m: ptxt): sig
   proc verify(L: pcred list, ev: event, m: ptxt, s: sig): bool
   proc link(s1: sig, s2: sig): bool
 }.
@@ -126,16 +123,9 @@ module LRS : LinkableRingSS = {
       sj <$ dexp;
       tj <$ dexp;
       pj <$ dexp;
-      if (i < j) {
-        ss <- ss ++ [sj];
-        ts <- ts ++ [tj];
-        ps <- ps ++ [pj];
-      }
-      else {
-        ss <- [sj] ++ ss;
-        ts <- [tj] ++ ts;
-        ps <- [pj] ++ ps;
-      }
+      ss <- ss ++ [sj];
+      ts <- ts ++ [tj];
+      ps <- ps ++ [pj];
       
       kj <- g ^ tj * h ^ pj * pk ^ sj * cred_j2 ^ c;
       kj' <- g ^ sj * cred_j1 ^ c;
@@ -199,6 +189,7 @@ module LRS : LinkableRingSS = {
   }
 
   proc link(s1: sig, s2: sig): bool = {
+    (* Does not verify signautures, so this must be done at the call site *)
     var t1, t2;
     var result: bool <- false;
     t1 <- s1 .` 5;
@@ -207,3 +198,99 @@ module LRS : LinkableRingSS = {
     return result;
   }
 }.
+
+
+module SignEquivalence = {
+  proc sign(L: pcred list, ev: event, sc_i: scred, m: ptxt): sig = {
+    var e: group;
+    var t: tag;
+ 
+    var xi, yi, ri;
+    var alp, bet, gam, c, c1: exp;
+    var ki, ki', ki'';
+    var j: int;
+
+    var cred_j: pcred;
+    var cred_j1, cred_j2: group;
+    var default_pcred;
+    var kj, kj', kj'';
+
+    var sj, tj, pj: exp;
+    var si, ti, pi: exp;
+    var ss, ts, ps: exp list;
+    
+    xi <- sc_i .` 1;
+    yi <- sc_i .` 2;
+    ri <- sc_i .` 3;
+
+    e <- H_G(ev);
+    t <- e ^ xi;
+    
+    alp <$ dexp;
+    bet <$ dexp;
+    gam <$ dexp;
+
+    ki <- LRS.g ^ alp * LRS.h ^ gam * LRS.pk ^ bet;
+    ki' <- LRS.g ^ bet;
+    ki'' <- e ^ alp;
+    c <- H_q(L, t, ki, ki', ki'', m);
+    (* Initially set c1 to c, will be overwriten later *)
+    c1 <- c;
+    
+    (* Initialise lists *)
+    ss <- [];
+    ts <- [];
+    ps <- [];
+    
+    j <- LRS.i + 1;
+    while (j <> LRS.i) {
+      if (j = 1) {c1 <- c;}
+      cred_j <- nth default_pcred L j;
+      cred_j1 <- cred_j .` 1;
+      cred_j2 <- cred_j .` 2;
+        
+      sj <$ dexp;
+      tj <$ dexp;
+      pj <$ dexp;
+      if (LRS.i < j) {
+        (* Append to end of lists *)
+        ss <- ss ++ [sj];
+        ts <- ts ++ [tj];
+        ps <- ps ++ [pj];
+      }
+      else {
+        (* Insert values into position j *)
+        ss <- insert sj ss j;
+        ts <- insert tj ts j;
+        ps <- insert pj ps j;
+      }
+      kj <- LRS.g ^ tj * LRS.h ^ pj * LRS.pk ^ sj * cred_j2 ^ c;
+      kj' <- LRS.g ^ sj * cred_j1 ^ c;
+      kj'' <- e ^ tj * t ^ c;
+      c <- H_q(L, t, kj, kj', kj'', m);
+      j <- j + 1;
+      (* If reached n, set back to 1 *)
+      if (j = size(L) + 1) {j <- 1;}
+    }
+    si <- bet - (c * ri);
+    ti <- alp - (c * xi);
+    pi <- gam - (c * yi);
+    ss <- put ss LRS.i si;
+    ts <- put ts LRS.i ti;
+    ps <- put ps LRS.i pi;
+    
+    return (c1, ss, ts, ps, t);
+  }
+}.
+
+
+lemma sign_equiv:
+equiv [LRS.sign ~ SignEquivalence.sign : ={L, ev, sc_i, m, LRS.g, LRS.h, LRS.pk, LRS.i} ==> ={res}].
+proof.
+  proc.
+  auto.
+  seq 16 16: (={xi, yi, ri, e, alp, bet, gam, LRS.g, LRS.h, LRS.i, LRS.pk, ki, ki', ki'', c, c1, ss, ts, ps}).
+  + auto.
+  seq 1 1: (j{1} = 1 /\ j{2} = LRS.i{2} + 1); auto.
+  + while (={j} < size ={L} + 1) (size ={L} + 1).
+qed.
