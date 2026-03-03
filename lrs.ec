@@ -77,7 +77,7 @@ module LRS : LinkableRingSS = {
     var t: tag;
  
     var xi, yi, ri;
-    var alp, bet, gam, c, c1: exp;
+    var alp, bet, gam, c, c1, ci: exp;
     var ki, ki', ki'';
     var j: int;
 
@@ -105,8 +105,9 @@ module LRS : LinkableRingSS = {
     ki' <- g ^ bet;
     ki'' <- e ^ alp;
     c <- H_q(L, t, ki, ki', ki'', m);
-    (* Initially set c1 to c, will be overwriten later *)
+    (* Initially set c1 & ci to c, will be overwriten later *)
     c1 <- c;
+    ci <- c;
     
     (* Initialise lists *)
     ss <- [];
@@ -116,6 +117,7 @@ module LRS : LinkableRingSS = {
     j <- 1;
     while (j < size(L) + 1) {
       if (j = 1) {c1 <- c;}
+      if (j = i) {ci <- c;}
       cred_j <- nth default_pcred L j;
       cred_j1 <- cred_j .` 1;
       cred_j2 <- cred_j .` 2;
@@ -133,9 +135,9 @@ module LRS : LinkableRingSS = {
       c <- H_q(L, t, kj, kj', kj'', m);
       j <- j + 1;
     }
-    si <- bet - (c * ri);
-    ti <- alp - (c * xi);
-    pi <- gam - (c * yi);
+    si <- bet - (ci * ri);
+    ti <- alp - (ci * xi);
+    pi <- gam - (ci * yi);
     ss <- put ss i si;
     ts <- put ts i ti;
     ps <- put ps i pi;
@@ -285,12 +287,15 @@ module SignEquivalence = {
 
 
 lemma sign_equiv:
-equiv [LRS.sign ~ SignEquivalence.sign : ={L, ev, sc_i, m, LRS.g, LRS.h, LRS.pk, LRS.i} ==> ={res}].
+equiv [LRS.sign ~ SignEquivalence.sign : ={LRS.i, LRS.g, LRS.h, LRS.pk, L, ev, sc_i, m} ==> ={res}].
 proof.
   proc.
   auto.
-  seq 16 16: (={xi, yi, ri, e, alp, bet, gam, LRS.g, LRS.h, LRS.i, LRS.pk, ki, ki', ki'', c, c1, ss, ts, ps}).
+  seq 17 16: (={LRS.i, alp, bet, gam}).
   + auto.
-  seq 1 1: (j{1} = 1 /\ j{2} = LRS.i{2} + 1); auto.
-  + while (={j} < size ={L} + 1) (size ={L} + 1).
+  seq 1 1: (={LRS.i} /\ j{1} = 1 /\ j{2} = LRS.i{2} + 1); auto.
+  + while (={LRS.i} /\ 0 < j{1} /\ 0 < j{2} /\ j{1} < size L{1} + 1 /\ j{2} < size L{1} + 1).
+    + seq 1 1: (={LRS.i} /\ 0 < j{1} /\ 0 < j{2} /\ j{1} < size L{1} + 1 /\ j{2} < size L{1} + 1).
+      + auto.
+    + seq 
 qed.
