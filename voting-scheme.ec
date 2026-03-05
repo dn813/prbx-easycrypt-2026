@@ -12,12 +12,16 @@ type nizk. (* NIZK proof object *)
 type result = vote list. (* final election result *)
 
 type group = Lrs.G.group.
-type exp = Lrs.exp.
+type exp = Lrs.GP.exp.
 
 (* Operations *)
+op ( * ): exp -> exp -> exp.
+op ( - ): exp -> exp -> exp.
+op ( ^ ): group -> exp -> group.
+op reenc (pk: pkey, g: group) (c: group * group, r': exp) = (c .` 1 * g ^ r', c .` 2 * pk ^ r').
 
 (* Distributions *)
-
+op [uniform lossless full] dint: int distr.
 
 module type VS = {
   proc setup(ta_count: int): unit
@@ -35,34 +39,42 @@ module type Adv = {
   proc guess(vj: voter): bool
 }.
 
-module type BB = {
-  proc registerkey(pk: pkey, pk_ta: pkey): unit
-}.
-
 module VotingScheme : VS = {
-  proc setup(ta_count: int): unit = {
-    var params;
-    var sk_ta: skey list <- [];
-    var sk_ta_i: exp;
-    var ta_i: int <- 0;
-    params <@ LRS.setup();
+  var pk: pkey
+  var g, h: generator
+  var voter_pcreds: pcred list
+  var ring_size: int
+  
+  proc setup(): unit = {
+    var lrs_params;
 
-    while (ta_i < ta_count) {
-      sk_ta_i <$ dexp;
-      sk_ta <- ta_sk ++ [sk_ta_i];
-      ta_i <- ta_i + 1;
-    }
+    lrs_params <@ LRS.setup();
 
-    BB.registerkey();
+    g <- lrs_params .` 1;
+    h <- lrs_params .` 2;
+    pk <- lrs_params .` 5;
   }
   
   proc setupelection(): ring * cs * event = {
-    var ev: event;
-    ev <- H_G();
+    ring_size <$ dint;
   }
 
   proc register(i: voter): pc * sc = {
-    return register(i);
+    var creds: (pcred * scred);
+    var pcred, pcred': pcred;
+    var r';
+    var pk_i: pkey;
+    var sk_i: skey;
+    
+    (* Get credentials *)
+    creds <@ LRS.kgen();
+    pcred <- creds .` 1;
+    sk_i <$ dexp;
+    pk_i <- g ^ sk_i;
+
+    (* Choose randomness - would be done by TA but we do it here, instead *)
+    r' <$ exp;
+    pcred' <- reenc(pk) (pcred, r');
   }
 }.
 

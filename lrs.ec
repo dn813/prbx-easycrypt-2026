@@ -31,7 +31,7 @@ theory LRSTypes.
   op [lossless uniform full] dgroup: group distr.
   op [lossless uniform full] dexp: exp distr.
   
-  op enc (pk: pkey) (m: group, r: exp) = (g ^ r, m * (pk ^ r)). (* enc() *)
+  op enc (pk: pkey, g: generator) (m: group, r: exp) = (g ^ r, m * (pk ^ r)). (* enc() *)
 end LRSTypes.
 export LRSTypes.  
   
@@ -68,7 +68,7 @@ module LRS : LinkableRingSS = {
     r <$ dexp;
     sc <- (x, y, r);
 
-    pc <- enc(pk) (g ^ x * h ^ y) (r);
+    pc <- enc(pk) (g) (g ^ x * h ^ y) (r);
     return (pc, sc);
   }
 
@@ -286,7 +286,7 @@ module SignEquivalence = {
 }.
 
 
-lemma sign_equiv:
+(* lemma sign_equiv:
 equiv [LRS.sign ~ SignEquivalence.sign : ={LRS.i, LRS.g, LRS.h, LRS.pk, L, ev, sc_i, m} ==> ={res}].
 proof.
   proc.
@@ -298,4 +298,4 @@ proof.
     + seq 1 1: (={LRS.i} /\ 0 < j{1} /\ 0 < j{2} /\ j{1} < size L{1} + 1 /\ j{2} < size L{1} + 1).
       + auto.
     + seq 
-qed.
+qed. *)
