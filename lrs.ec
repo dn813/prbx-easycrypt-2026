@@ -15,12 +15,11 @@ theory LRSTypes.
   type scred = exp * exp * exp. (* private credential/signature *)
   type sig = exp * exp list * exp list * exp list * tag. (* Signature *)
   type generator = group. (* Group generator *)
-  type ring.
+  type ptxt = group * group. (* Plaintext *)
+  type ring = pcred list.
 
-  type string = pcred list * tag * group * group * group * group.
+  type string = ring * tag * group * group * group * ptxt.
   type event = string.
-
-  type ptxt = group. (* Plaintext *)
 
   op H_G: string -> group.
   op H_q: string -> exp.
@@ -38,8 +37,8 @@ export LRSTypes.
 module type LinkableRingSS = {
   proc setup(): generator * generator * (string -> group) * (string -> exp) * pkey
   proc kgen(): pcred * scred
-  proc sign(L: pcred list, ev: event, sc_i: scred, m: ptxt): sig
-  proc verify(L: pcred list, ev: event, m: ptxt, s: sig): bool
+  proc sign(L: ring, ev: event, sc_i: scred, m: ptxt): sig
+  proc verify(L: ring, ev: event, m: ptxt, s: sig): bool
   proc link(s1: sig, s2: sig): bool
 }.
 
@@ -72,7 +71,7 @@ module LRS : LinkableRingSS = {
     return (pc, sc);
   }
 
-  proc sign(L: pcred list, ev: event, sc_i: scred, m: ptxt): sig = {
+  proc sign(L: ring, ev: event, sc_i: scred, m: ptxt): sig = {
     var e: group;
     var t: tag;
  
@@ -83,7 +82,6 @@ module LRS : LinkableRingSS = {
 
     var cred_j: pcred;
     var cred_j1, cred_j2: group;
-    var default_pcred;
     var kj, kj', kj'';
 
     var sj, tj, pj: exp;
@@ -118,7 +116,7 @@ module LRS : LinkableRingSS = {
     while (j < size(L) + 1) {
       if (j = 1) {c1 <- c;}
       if (j = i) {ci <- c;}
-      cred_j <- nth default_pcred L j;
+      cred_j <- nth cred_j L j;
       cred_j1 <- cred_j .` 1;
       cred_j2 <- cred_j .` 2;
         
@@ -145,7 +143,7 @@ module LRS : LinkableRingSS = {
     return (c1, ss, ts, ps, t);
   }
 
-  proc verify(L: pcred list, ev: event, m: ptxt, sig: sig): bool = {
+  proc verify(L: ring, ev: event, m: ptxt, sig: sig): bool = {
     var c1, c: exp;
     var ss, ts, ps: exp list;
     var t: tag;
@@ -156,7 +154,6 @@ module LRS : LinkableRingSS = {
     
     var cred_j: pcred;
     var cred_j1, cred_j2: group;
-    var default_pcred;
     var kj, kj', kj'';
 
     var result: bool;
@@ -177,7 +174,7 @@ module LRS : LinkableRingSS = {
     j <- 1;
     c <- c1;
     while (j < size(L)) {
-      cred_j <- nth default_pcred L j;
+      cred_j <- nth cred_j L j;
       cred_j1 <- cred_j .` 1;
       cred_j2 <- cred_j .` 2;
 
@@ -203,7 +200,7 @@ module LRS : LinkableRingSS = {
 
 
 module SignEquivalence = {
-  proc sign(L: pcred list, ev: event, sc_i: scred, m: ptxt): sig = {
+  proc sign(L: ring, ev: event, sc_i: scred, m: ptxt): sig = {
     var e: group;
     var t: tag;
  
@@ -214,7 +211,6 @@ module SignEquivalence = {
 
     var cred_j: pcred;
     var cred_j1, cred_j2: group;
-    var default_pcred;
     var kj, kj', kj'';
 
     var sj, tj, pj: exp;
@@ -247,7 +243,7 @@ module SignEquivalence = {
     j <- LRS.i + 1;
     while (j <> LRS.i) {
       if (j = 1) {c1 <- c;}
-      cred_j <- nth default_pcred L j;
+      cred_j <- nth cred_j L j;
       cred_j1 <- cred_j .` 1;
       cred_j2 <- cred_j .` 2;
         
@@ -298,4 +294,4 @@ proof.
     + seq 1 1: (={LRS.i} /\ 0 < j{1} /\ 0 < j{2} /\ j{1} < size L{1} + 1 /\ j{2} < size L{1} + 1).
       + auto.
     + seq 
-qed. *)
+qed.*)

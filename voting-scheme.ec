@@ -1,37 +1,32 @@
-require import AllCore List IntDiv Bool Distr.
+require import AllCore List IntDiv Bool Distr DList.
 require import Lrs.
 
 (* Types *)
-type cnd.  (* candidate *)
-type vote.
-type voter.
-type cs = cnd list.  (* candidate selection *)
-type ballot. (* encrypted vote *)
-type bb = ballot list. (* bulletin board *)
-type nizk. (* NIZK proof object *)
-type result = vote list. (* final election result *)
+type voter = int.
+type bb. (* bulletin board *)
+type ballot = ptxt * ring * sig. (* encrypted vote *)
 
 type group = Lrs.G.group.
 type exp = Lrs.GP.exp.
 
+type cnd = group.  (* candidate *)
+
 (* Operations *)
-op ( * ): exp -> exp -> exp.
+op ( * ): group -> group -> group.
 op ( - ): exp -> exp -> exp.
 op ( ^ ): group -> exp -> group.
-op reenc (pk: pkey, g: group) (c: group * group, r': exp) = (c .` 1 * g ^ r', c .` 2 * pk ^ r').
+op reenc (pk: pkey, g: group) (c: group * group, r': exp) = (c .` 1 * g ^ r', c .` 2 * pk ^ r'). (* ReEnc() *)
+op get_ev: unit -> event.
 
 (* Distributions *)
 op [uniform lossless full] dint: int distr.
 
 module type VS = {
-  proc setup(ta_count: int): unit
-  proc register(i: voter): pcred * scred
-  proc setupelection(): ring * cs * event
+  proc setup(): unit
+  proc register(i: voter): pcred
+  proc setupelection(): unit
   proc vote(cnd: cnd, sc_i: scred, i: voter): ballot
   proc isvalid(b: ballot, bb: bb): bool
-  proc shuffle(bb: bb): nizk
-  proc tally(sk: skey, bb: bb): result * nizk
-  proc verify(bb: bb, t: result, pi: nizk): bool
 }.
 
 module type Adv = {
@@ -42,39 +37,94 @@ module type Adv = {
 module VotingScheme : VS = {
   var pk: pkey
   var g, h: generator
-  var voter_pcreds: pcred list
-  var ring_size: int
+  var l0: pcred list (* L^(0) - list of encrypted credentials *)
+  var ring_size: int (* Global constant ring size β *)
+  var ev: event
   
   proc setup(): unit = {
     var lrs_params;
 
     lrs_params <@ LRS.setup();
 
+    (* Set generators and TA total public key *)
     g <- lrs_params .` 1;
     h <- lrs_params .` 2;
     pk <- lrs_params .` 5;
   }
   
-  proc setupelection(): ring * cs * event = {
-    ring_size <$ dint;
+  proc setupelection(): unit = {
+    (* Set constant global ring size at random (β) *)
+    ring_size <$ [1..size l0];
+    ev <- get_ev();
   }
 
-  proc register(i: voter): pc * sc = {
+  proc register(i: voter): pcred = {
     var creds: (pcred * scred);
-    var pcred, pcred': pcred;
+    var pc, pc': pcred;
     var r';
     var pk_i: pkey;
     var sk_i: skey;
     
     (* Get credentials *)
     creds <@ LRS.kgen();
-    pcred <- creds .` 1;
+    pc <- creds .` 1;
     sk_i <$ dexp;
     pk_i <- g ^ sk_i;
 
     (* Choose randomness - would be done by TA but we do it here, instead *)
-    r' <$ exp;
-    pcred' <- reenc(pk) (pcred, r');
+    r' <$ dexp;
+    pc' <- reenc(pk) (g) (pc) (r');
+
+    l0 <- l0 ++ [pc'];
+
+    return pc';
+  }
+
+  proc vote(cnd: cnd, sc_i: scred, i: voter): ballot = {
+    var r_i, r, r'': exp; (* randomness for encryptions *)
+    var x_i, y_i; (* elements of sc*_i *)
+    var pc_i; (* public counterpart to sc*_i *)
+    var j, li_j_index: int; (* index j, and index of j-th selection from L^(0) *)
+    var li, l0_no_i: ring; (* list L^(i) and L^(0) without the i-th credential *)
+    var li_j: pcred; (* j-th credential to be added to L^(i) *)
+    var ith_insert_i; (* Index of where to insert pc*_i *)
+    var m_i: ptxt; (* Encrypted ballot to be signed *)
+    var sig_i: sig; (* Ballot signature *)
+    var b_i: ballot; (* Ballot *)
+    r_i <$ dexp;
+    r <$ dexp;
+    r'' <$ dexp;
+    
+    x_i <- sc_i .` 1; (* x*_i *)
+    y_i <- sc_i .` 2; (* y*_i *)
+
+    pc_i <- enc (pk) (g) (g ^ x_i * h ^ y_i) (r_i); (* pc*_i *)
+    
+    j <- 1;
+    l0_no_i <- drop i l0;
+    li <- nseq (ring_size - 1) li_j; (* Initialise list L^(i) *)
+    while (j < ring_size) {
+      li_j_index <$ [1..size l0_no_i];  (* Is this the right way to do this? *)
+      li_j <- nth li_j l0_no_i li_j_index;
+      li_j <- reenc (pk) (g) (li_j) (r'');
+
+      (* insert j-th encrypted credentials into L^(i) *)
+      if (j <> i) {
+      li <- put li j li_j; 
+      }
+
+      j <- j + 1;
+    }
+
+    (* Insert pc*_i into a random position in L^(i) *)
+    ith_insert_i <$ [1..ring_size];
+    li <- insert pc_i li ith_insert_i;
+
+    m_i <- enc (pk) (g) (cnd) (r);
+    sig_i <@ LRS.sign(li, ev, sc_i, m_i);
+
+    b_i <- (m_i, li, sig_i);
+    return b_i;
   }
 }.
 
