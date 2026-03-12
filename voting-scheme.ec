@@ -1,4 +1,4 @@
-require import AllCore List IntDiv Bool Distr DList.
+require import AllCore List IntDiv Bool DBool Distr DList.
 require import Lrs.
 
 (* Types *)
@@ -12,26 +12,21 @@ type exp = Lrs.GP.exp.
 type cnd = group.  (* candidate *)
 
 (* Operations *)
-op ( * ): group -> group -> group.
+abbrev ( * ) = Lrs.G.( * ).
+abbrev ( ^ ) = Lrs.GP.( ^ ).
 op ( - ): exp -> exp -> exp.
-op ( ^ ): group -> exp -> group.
 op reenc (pk: pkey, g: group) (c: group * group, r': exp) = (c .` 1 * g ^ r', c .` 2 * pk ^ r'). (* ReEnc() *)
 op get_ev: unit -> event.
 
 (* Distributions *)
 op [uniform lossless full] dint: int distr.
+op dcnd: cnd distr.
 
 module type VS = {
   proc setup(): unit
-  proc register(i: voter): pcred
+  proc register(i: voter): pcred * scred
   proc setupelection(): unit
   proc vote(cnd: cnd, sc_i: scred, i: voter): ballot
-  proc isvalid(b: ballot, bb: bb): bool
-}.
-
-module type Adv = {
-  proc coerce(vj: voter, cnd: cnd): unit
-  proc guess(vj: voter): bool
 }.
 
 module VotingScheme : VS = {
@@ -58,9 +53,10 @@ module VotingScheme : VS = {
     ev <- get_ev();
   }
 
-  proc register(i: voter): pcred = {
+  proc register(i: voter): pcred * scred = {
     var creds: (pcred * scred);
     var pc, pc': pcred;
+    var sc: scred;
     var r';
     var pk_i: pkey;
     var sk_i: skey;
@@ -68,6 +64,7 @@ module VotingScheme : VS = {
     (* Get credentials *)
     creds <@ LRS.kgen();
     pc <- creds .` 1;
+    sc <- creds .` 2;
     sk_i <$ dexp;
     pk_i <- g ^ sk_i;
 
@@ -77,7 +74,7 @@ module VotingScheme : VS = {
 
     l0 <- l0 ++ [pc'];
 
-    return pc';
+    return (pc', sc);
   }
 
   proc vote(cnd: cnd, sc_i: scred, i: voter): ballot = {
@@ -128,22 +125,117 @@ module VotingScheme : VS = {
   }
 }.
 
+module type Adv = {
+  (* Pick a target for coercion attempt *)
+  proc picktarget(): voter
+  (* Cast a ballot using obtained credential *)
+  proc vote(): unit
+  (* Guess whether the voter followed instructions *)
+  proc guess(): bool
+  (* Receive and store the potentially faked credential from voter *)
+  proc receive(sc': scred): unit
+}.
+
 module Adversary : Adv = {
-  proc targetselect(): voter list = {
-    var subset: voter list;
-    return subset;
+  var votersc': scred
+  var choice: cnd
+  var target: voter
+
+  proc picktarget(): voter = {
+    target <$ [1..size VotingScheme.l0];
+    return target;
   }
-  proc coerce(vj: voter, cnd: cnd, sc: sc): unit = {
-    VotingScheme.vote(cnd, sc, vj);
+
+  proc vote(): unit = {
+    VotingScheme.vote(choice, votersc', target);
   }
-  proc guess(vj: voter): bool = {
+  proc guess(): bool = {
     var guess: bool;
     guess <$ {0,1};
+    return guess;
+  }
+
+  proc receive(sc': scred): unit = {
+    votersc' <- sc';
   }
 }.
 
-section games.
+section Games.
+
+local module type Voter = {
+  (* Decide behaviour (cooperate or deceive) *)
+  proc flip(): unit
+  (* Register with RA to receive credentials *)
+  proc register(voter: voter): unit
+  (* Provide coercer with credentials - real or fake *)
+  proc yieldsc(): scred
+  (* Vote - if real credential not forfeited *)
+  proc vote(): unit
+}.
+
+local module Voter0 : Voter = {
+  var behaviour: bool
+  var sc: scred
+  var voter: voter
+
+  proc flip(): unit = {
+    behaviour <$ {0,1};
+  }
+
+  proc register(voter: voter): unit = {
+    var creds: pcred * scred;
+    creds <@ VotingScheme.register(voter);
+    sc <- creds .` 2;
+    voter <- voter;
+  }
+
+  proc yieldsc(): scred = {
+    var sc': scred;
+    var kgen_creds: pcred * scred;
+    if (behaviour = true) {
+      (* Yield real credential *)
+      sc' <- sc;
+    }
+    else {
+      (* Generate fake credential *)
+      kgen_creds <@ LRS.kgen();
+      sc' <- kgen_creds .` 2;
+    }
+    return sc';
+  }
+
+  proc vote(): unit = {
+    var choice: cnd;
+    
+    if (behaviour = true) {
+      (* Cannot vote, as credential was forfeited *)
+    }
+    else {
+      (* Vote using real credential in moment of privacy *)
+      choice <$ dcnd;
+      VotingScheme.vote(choice, sc, voter);
+    }
+  }
+}.
+
+local module Game0 = {
+  proc main(): unit = {
+    var votersc': scred;
+    var voter: voter;
+
+    voter <@ Adversary.picktarget();
+    Voter0.register(voter);
+    Voter0.flip();
+    votersc' <@ Voter0.yieldsc();
+    Adversary.receive(votersc');
+
+    Adversary.vote();
+    Voter0.vote();
+
+    
+  }
+  
+}.
 
 
-
-end section.
+end section Games.
