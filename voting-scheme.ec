@@ -218,24 +218,71 @@ local module Voter0 : Voter = {
   }
 }.
 
-local module Game0 = {
+local module Voter1 : Voter = {
+  var behaviour: bool
+  var sc: scred
+  var voter: voter
+
+  proc flip(): unit = {
+    behaviour <$ {0,1};
+  }
+
+  proc register(voter: voter): unit = {
+    var creds: pcred * scred;
+    creds <@ VotingScheme.register(voter);
+    sc <- creds .` 2;
+    voter <- voter;
+  }
+
+  proc yieldsc(): scred = {
+    var sc': scred;
+    var kgen_creds: pcred * scred;
+    if (behaviour = true) {
+      (* Yield real credential *)
+      sc' <- sc;
+    }
+    else {
+      (* Generate fake credential *)
+      kgen_creds <@ LRS.kgen();
+      sc' <- kgen_creds .` 2;
+    }
+    return sc';
+  }
+
+  proc vote(): unit = {
+    var choice: cnd;
+    var kgen_creds: pcred * scred;
+    if (behaviour = true) {
+      (* Cannot vote, as credential was forfeited *)
+    }
+    else {
+      choice <$ dcnd;
+      kgen_creds <@ LRS.kgen();
+      VotingScheme.vote(choice, kgen_creds .` 2, voter);
+    }
+  }
+}.
+
+local module Game(V: Voter) = {
   proc main(): unit = {
     var votersc': scred;
     var voter: voter;
 
     voter <@ Adversary.picktarget();
-    Voter0.register(voter);
-    Voter0.flip();
-    votersc' <@ Voter0.yieldsc();
+    V.register(voter);
+    V.flip();
+    votersc' <@ V.yieldsc();
     Adversary.receive(votersc');
 
     Adversary.vote();
-    Voter0.vote();
-
-    
+    V.vote();
   }
   
 }.
+
+local module Game0 = Game(Voter0).
+
+local module Game1 = Game(Voter1).
 
 
 end section Games.
