@@ -27,6 +27,7 @@ module type VS = {
   proc register(i: voter): pcred * scred
   proc setupelection(): unit
   proc vote(cnd: cnd, sc_i: scred, i: voter): ballot
+  proc getev(): event
 }.
 
 module VotingScheme : VS = {
@@ -35,6 +36,8 @@ module VotingScheme : VS = {
   var l0: pcred list (* L^(0) - list of encrypted credentials *)
   var ring_size: int (* Global constant ring size β *)
   var ev: event
+
+  proc getev(): event = {return ev;}
   
   proc setup(): unit = {
     var lrs_params;
@@ -68,7 +71,7 @@ module VotingScheme : VS = {
     sk_i <$ dexp;
     pk_i <- g ^ sk_i;
 
-    (* Choose randomness - would be done by TA but we do it here, instead *)
+    (* Choose randomness - would be done by RA but we do it here, instead *)
     r' <$ dexp;
     pc' <- reenc(pk) (g) (pc) (r');
 
@@ -78,7 +81,7 @@ module VotingScheme : VS = {
   }
 
   proc vote(cnd: cnd, sc_i: scred, i: voter): ballot = {
-    var r_i, r, r'': exp; (* randomness for encryptions *)
+    var r_i, r, r_j: exp; (* randomness for encryptions *)
     var x_i, y_i; (* elements of sc*_i *)
     var pc_i; (* public counterpart to sc*_i *)
     var j, li_j_index: int; (* index j, and index of j-th selection from L^(0) *)
@@ -90,7 +93,6 @@ module VotingScheme : VS = {
     var b_i: ballot; (* Ballot *)
     r_i <$ dexp;
     r <$ dexp;
-    r'' <$ dexp;
     
     x_i <- sc_i .` 1; (* x*_i *)
     y_i <- sc_i .` 2; (* y*_i *)
@@ -98,18 +100,19 @@ module VotingScheme : VS = {
     pc_i <- enc (pk) (g) (g ^ x_i * h ^ y_i) (r_i); (* pc*_i *)
     
     j <- 1;
+    li_j <- pc_i; (* Initialise li_j to pc_i as it is available - will be overwritten *)
     l0_no_i <- drop i l0;
-    li <- nseq (ring_size - 1) li_j; (* Initialise list L^(i) *)
+    li <- nseq (ring_size - 1) li_j; (* Initialise list L^(i) using pc_i/li_j *)
     while (j < ring_size) {
-      li_j_index <$ [1..size l0_no_i];  (* Is this the right way to do this? *)
-      li_j <- nth li_j l0_no_i li_j_index;
-      li_j <- reenc (pk) (g) (li_j) (r'');
-
-      (* insert j-th encrypted credentials into L^(i) *)
+      r_j <$ dexp; (* Randomly select randomness for re-encrypting jth credential *)
       if (j <> i) {
-      li <- put li j li_j; 
-      }
+        li_j_index <$ [1..size l0_no_i];  (* Is this the right way to do this? *)
+        li_j <- nth li_j l0_no_i li_j_index;
+        li_j <- reenc (pk) (g) (li_j) (r_j);
 
+        (* insert j-th encrypted credentials into L^(i) *)
+        li <- put li j li_j; 
+      }
       j <- j + 1;
     }
 
@@ -129,7 +132,7 @@ module type Adv = {
   (* Pick a target for coercion attempt *)
   proc picktarget(): voter
   (* Cast a ballot using obtained credential *)
-  proc vote(): unit
+  proc vote(): ballot
   (* Guess whether the voter followed instructions *)
   proc guess(): bool
   (* Receive and store the potentially faked credential from voter *)
@@ -146,8 +149,10 @@ module Adversary : Adv = {
     return target;
   }
 
-  proc vote(): unit = {
-    VotingScheme.vote(choice, votersc', target);
+  proc vote(): ballot = {
+    var ballot;
+    ballot <@ VotingScheme.vote(choice, votersc', target);
+    return ballot;
   }
   proc guess(): bool = {
     var guess: bool;
@@ -170,7 +175,9 @@ local module type Voter = {
   (* Provide coercer with credentials - real or fake *)
   proc yieldsc(): scred
   (* Vote - if real credential not forfeited *)
-  proc vote(): unit
+  proc vote(): ballot
+  (* Reveal voter behvaiour - inaccessible to Adv *)
+  proc revealb(): bool
 }.
 
 local module Voter0 : Voter = {
@@ -204,18 +211,16 @@ local module Voter0 : Voter = {
     return sc';
   }
 
-  proc vote(): unit = {
+  proc vote(): ballot = {
     var choice: cnd;
-    
-    if (behaviour = true) {
-      (* Cannot vote, as credential was forfeited *)
-    }
-    else {
-      (* Vote using real credential in moment of privacy *)
-      choice <$ dcnd;
-      VotingScheme.vote(choice, sc, voter);
-    }
+    var ballot: ballot;
+    (* Vote using real credential in moment of privacy *)
+    choice <$ dcnd;
+    ballot <@ VotingScheme.vote(choice, sc, voter);
+    return ballot;
   }
+
+  proc revealb(): bool = {return behaviour;}
 }.
 
 local module Voter1 : Voter = {
@@ -249,40 +254,89 @@ local module Voter1 : Voter = {
     return sc';
   }
 
-  proc vote(): unit = {
+  proc vote(): ballot = {
     var choice: cnd;
     var kgen_creds: pcred * scred;
-    if (behaviour = true) {
-      (* Cannot vote, as credential was forfeited *)
-    }
-    else {
-      choice <$ dcnd;
-      kgen_creds <@ LRS.kgen();
-      VotingScheme.vote(choice, kgen_creds .` 2, voter);
-    }
+    var ballot: ballot;
+    choice <$ dcnd;
+    kgen_creds <@ LRS.kgen();
+    ballot <@ VotingScheme.vote(choice, kgen_creds .` 2, voter);
+    return ballot;
   }
+
+  proc revealb(): bool = {return behaviour;}
 }.
 
-local module Game(V: Voter) = {
-  proc main(): unit = {
+local module Voter2 : Voter = {
+  var behaviour: bool
+  var sc: scred
+  var voter: voter
+
+  proc flip(): unit = {
+    behaviour <$ {0,1};
+  }
+
+  proc register(voter: voter): unit = {
+    var creds: pcred * scred;
+    creds <@ VotingScheme.register(voter);
+    sc <- creds .` 2;
+    voter <- voter;
+  }
+
+  proc yieldsc(): scred = {
+    return sc; (* Always yield real credential, regardless of behaviour *)
+  }
+
+  proc vote(): ballot = {
+   var choice: cnd;
+   var ballot: ballot;
+   (* Vote using real credential in moment of privacy *)
+   choice <$ dcnd;
+   ballot <@ VotingScheme.vote(choice, sc, voter);
+   return ballot;
+  }
+
+  proc revealb(): bool = {return behaviour;}
+}.
+
+local module Game(V: Voter) (A: Adv) (VS: VS) = {
+  proc main(): bool = {
     var votersc': scred;
     var voter: voter;
+    var voter_ballot: ballot;
+    var voter_valid: bool;
+    var ev: event;
+    var b', b: bool;
 
-    voter <@ Adversary.picktarget();
+    voter <@ A.picktarget();
     V.register(voter);
     V.flip();
     votersc' <@ V.yieldsc();
-    Adversary.receive(votersc');
+    A.receive(votersc');
 
-    Adversary.vote();
-    V.vote();
+    VS.setupelection();
+
+    A.vote();
+    voter_ballot <@ V.vote();
+
+    ev <@ VS.getev();
+
+    voter_valid <@ LRS.verify(voter_ballot .` 2, ev, voter_ballot .` 1, voter_ballot .` 3);
+
+    b' <@ A.guess();
+    b <@ V.revealb();
+
+    return b = b';
   }
-  
 }.
 
-local module Game0 = Game(Voter0).
 
-local module Game1 = Game(Voter1).
-
+local lemma Games01_indist &m:
+  `|Pr[Game(Voter0, Adversary, VotingScheme).main() @ &m : res]
+  - Pr[Game(Voter1, Adversary, VotingScheme).main() @ &m : res]| = 0%r.
+proof.
+  proc*.
+qed.
 
 end section Games.
+
