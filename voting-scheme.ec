@@ -333,12 +333,13 @@ local module Game(V: Voter) (A: Adv) (VS: VS) = {
 }.
 
 
-local lemma Games01_indist &m:
-  `|Pr[Game(Voter0, Adversary, VotingScheme).main() @ &m : res]
-  - Pr[Game(Voter1, Adversary, VotingScheme).main() @ &m : res]| = 0%r.
-proof.
-  proc*.
-qed.
-
+lemma Games01_indist &m:
+  Pr[Game(Voter0, Adversary, VotingScheme).main() @ &m : res] =
+  Pr[Game(Voter1, Adversary, VotingScheme).main() @ &m : res].
+  proof.
+  byequiv => //.
+  proc; inline*.
+  seq 21 21: (={Adversary.target, voter, voter0, i, creds0, pc, sc, sk_i, pk_i, r', pc', VotingScheme.l0, creds} /\ x0{1} = x1{2} /\ y0{1} = y1{2} /\ r2{1} = r3{2} /\ sc1{1} = sc2{2}).
+    + swap [5..8] -3; swap 13 -8; swap 15 -9; swap 21 -14; wp.
 end section Games.
 
