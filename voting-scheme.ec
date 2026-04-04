@@ -36,6 +36,7 @@ module VotingScheme : VS = {
   var l0: pcred list (* L^(0) - list of encrypted credentials *)
   var ring_size: int (* Global constant ring size β *)
   var ev: event
+  var bb: ballot list (* Bulletin board *)
 
   proc getev(): event = {return ev;}
   
@@ -124,6 +125,7 @@ module VotingScheme : VS = {
     sig_i <@ LRS.sign(li, ev, sc_i, m_i);
 
     b_i <- (m_i, li, sig_i);
+    bb <- bb ++ [b_i]; (* Append ballot to bulletin board *)
     return b_i;
   }
 }.
