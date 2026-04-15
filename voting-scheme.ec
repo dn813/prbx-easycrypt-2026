@@ -336,10 +336,45 @@ local module Game(V: Voter) (A: Adv) (VS: VS) = {
 lemma Games01_indist &m:
   Pr[Game(Voter0, Adversary, VotingScheme).main() @ &m : res] =
   Pr[Game(Voter1, Adversary, VotingScheme).main() @ &m : res].
-  proof.
+proof.
   byequiv => //.
-  proc; inline*.
-  seq 21 21: (={Adversary.target, voter, voter0, i, creds0, pc, sc, sk_i, pk_i, r', pc', VotingScheme.l0, creds} /\ x0{1} = x1{2} /\ y0{1} = y1{2} /\ r2{1} = r3{2} /\ sc1{1} = sc2{2}).
-    + swap [5..8] -3; swap 13 -8; swap 15 -9; swap 21 -14; wp.
+  proc; inline*; wp.
+  rnd; wp => /=.
+  while (true) => //=; wp => //.
+  rnd; rnd; rnd; wp => /=.
+  while (={j3, L1}) => //=.
+  + wp.
+  + rnd; rnd; rnd.
+  + wp => //=.
+  wp => /=.
+  rnd; rnd; rnd. wp => /=.
+  rnd => /=.
+  while (={j1, i1, VotingScheme.ring_size}).
+  + wp => /=.
+  + seq 1 1: (={j1, VotingScheme.ring_size, i1}).
+    + rnd => //=.
+  + if => //.
+  + wp. rnd => //=. admit.
+  wp => /=.
+  rnd; rnd.
+  wp.
+  rnd{2}; rnd{2}; rnd{2}.
+  rnd.
+  wp.
+  while (={j2, L0}) => /=. wp.
+  + rnd; rnd; rnd => /=.
+  + wp => //=.
+  wp. rnd; rnd; rnd.
+  wp. rnd => /=.
+  while (={j0, i0, VotingScheme.ring_size}).
+  + wp => /=.
+  + seq 1 1: (={j0, i0, VotingScheme.ring_size}).
+    + rnd => //=.
+  + if => //=.
+  + wp. rnd => //=. admit.
+  wp. rnd; rnd.
+  wp. rnd.
+  wp => /=.
+  
 end section Games.
 
