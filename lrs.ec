@@ -281,17 +281,12 @@ module SignEquivalence = {
   }
 }.
 
-(* 
-lemma sign_equiv:
+(* lemma sign_equiv:
 equiv [LRS.sign ~ SignEquivalence.sign : ={LRS.i, LRS.g, LRS.h, LRS.pk, L, ev, sc_i, m} ==> ={res}].
 proof.
   proc.
-  auto.
-  seq 17 16: (={LRS.i, alp, bet, gam}); auto.
-  seq 1 1: (={LRS.i} /\ j{1} = 1 /\ j{2} = LRS.i{2} + 1); auto.
-  + while (={LRS.i} /\ 0 < j{1} /\ 0 < j{2} /\ j{1} < size L{1} + 1 /\ j{2} < size L{1} + 1).
-    + seq 1 1: (={LRS.i} /\ 0 < j{1} /\ 0 < j{2} /\ j{1} < size L{1} + 1 /\ j{2} < size L{1} + 1).
-      + auto.
-      rcondt{1} 1.
-qed.
+  wp => /=.
+  while ()  
 *)
+
+
