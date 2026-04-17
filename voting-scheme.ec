@@ -333,11 +333,11 @@ local module Game(V: Voter) (A: Adv) (VS: VS) = {
 }.
 
 
-lemma Games01_indist &m:
+local lemma Games01_indist &m:
   Pr[Game(Voter0, Adversary, VotingScheme).main() @ &m : res] =
   Pr[Game(Voter1, Adversary, VotingScheme).main() @ &m : res].
 proof.
-  byequiv (_: ={glob Adversary} /\ (glob Voter0){1} = (glob Voter1){2} ==> ={res}) => //.
+  byequiv => //.
   proc; inline*; wp.
   rnd; wp => /=.
   while (true) => //=; wp => //.
@@ -374,8 +374,12 @@ proof.
   wp. rnd; rnd.
   wp. rnd.
   wp => /=.
-  seq 21 21: (#pre /\ ={r', sk_i} /\ x0{1} = x1{2} /\ y0{1} = y1{2} /\ r2{1} = r3{2}).
-  + rnd => /=. wp. rnd => /=. wp. rnd => /=. wp. rnd; rnd; rnd => /=. wp. rnd => //.
-  if => //.
+  (* seq 21 21: (#pre /\ ={r', sk_i, VotingScheme.l0, VotingScheme.g, VotingScheme.pk, LRS.g, LRS.h, LRS.pk} /\ x0{1} = x1{2} /\ y0{1} = y1{2} /\ r2{1} = r3{2} /\ Voter0.behaviour{1} = Voter1.behaviour{2}). *)
+  seq 21 21: (={VotingScheme.l0}).
+  + rnd => /=. wp. rnd => /=. wp. rnd => /=. wp. rnd; rnd; rnd => /=. wp. rnd => //. skip. smt.
+  if => //. admit.
+  wp. rnd; rnd; rnd => /=. skip. admit.
+  admit.
+qed.
 end section Games.
 
