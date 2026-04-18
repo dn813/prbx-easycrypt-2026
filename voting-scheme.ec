@@ -373,5 +373,47 @@ proof.
   admit.
   admit.
 qed.
+
+local lemma Games12_indist &m:
+  Pr[Game(Voter1, Adversary, VotingScheme).main() @ &m : res] =
+  Pr[Game(Voter2, Adversary, VotingScheme).main() @ &m : res].
+proof.
+  byequiv => //.
+  proc; inline*; wp.
+  rnd. wp.
+  while (={j2, L0}) => //=.
+  + wp.
+  + rnd; rnd; rnd.
+  + wp => //=.
+  wp => /=.
+  rnd; rnd; rnd. wp => /=. rnd => /=.
+  while (={j0, i1, VotingScheme.ring_size} /\ size l0_no_i0{1} = size l0_no_i0{2}).
+  + wp.
+  + seq 1 1: (#pre).
+    + rnd => //.
+  + if => //.
+  + wp. rnd => //=. skip. smt.
+  wp. rnd; rnd. wp.
+  rnd{1}; rnd{1}; rnd{1}.
+  rnd. wp.
+  while (={j1, L}) => /=. wp.
+  + rnd; rnd; rnd => //=.
+  + wp => //=.
+  wp. rnd; rnd; rnd.
+  wp. rnd => /=.
+  while (={j, i0, VotingScheme.ring_size} /\ size l0_no_i{1} = size l0_no_i{2}).
+  + wp => /=.
+  + seq 1 1: (#pre).
+    + rnd => //.
+  + if => //.
+  + wp. rnd => //=. skip. smt.
+  wp. rnd; rnd. wp. rnd. wp.
+  seq 21 21: (#pre /\ ={r', sk_i, VotingScheme.l0, VotingScheme.g, VotingScheme.pk, LRS.g, LRS.h, LRS.pk} /\ x1{1} = x{2} /\ y1{1} = y{2} /\ r3{1} = r1{2}).
+  + rnd => /=. wp. rnd => /=. wp. rnd => /=. wp. rnd; rnd; rnd => /=. wp. rnd => //.
+  + 
+  if => //.
+  + wp. skip => //=.if{1} => //.
+  admit.
+qed.
 end section Games.
 
