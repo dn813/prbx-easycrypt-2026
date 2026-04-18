@@ -305,9 +305,6 @@ local module Game(V: Voter) (A: Adv) (VS: VS) = {
   proc main(): bool = {
     var votersc': scred;
     var voter: voter;
-    var voter_ballot: ballot;
-    var voter_valid: bool;
-    var ev: event;
     var b', b: bool;
 
     voter <@ A.picktarget();
@@ -319,11 +316,7 @@ local module Game(V: Voter) (A: Adv) (VS: VS) = {
     VS.setupelection();
 
     A.vote();
-    voter_ballot <@ V.vote();
-
-    ev <@ VS.getev();
-
-    voter_valid <@ LRS.verify(voter_ballot .` 2, ev, voter_ballot .` 1, voter_ballot .` 3);
+    V.vote();
 
     b' <@ A.guess();
     b <@ V.revealb();
@@ -337,18 +330,16 @@ local lemma Games01_indist &m:
   Pr[Game(Voter0, Adversary, VotingScheme).main() @ &m : res] =
   Pr[Game(Voter1, Adversary, VotingScheme).main() @ &m : res].
 proof.
-  byequiv => //.
+  byequiv (_: ={glob Adversary} /\ (glob Voter0){1} = (glob Voter1){2} ==> _) => //.
   proc; inline*; wp.
   rnd; wp => /=.
-  while (true) => //=; wp => //.
-  rnd; rnd; rnd; wp => /=.
-  while (={j3, L1}) => //=.
+  while (={j2, L0}) => //=.
   + wp.
   + rnd; rnd; rnd.
   + wp => //=.
   wp => /=.
   rnd; rnd; rnd. wp => /=. rnd => /=.
-  while (={j1, i1, VotingScheme.ring_size} /\ size l0_no_i0{1} = size l0_no_i0{2}).
+  while (={j0, i1, VotingScheme.ring_size} /\ size l0_no_i0{1} = size l0_no_i0{2}).
   + wp.
   + seq 1 1: (#pre).
     + rnd => //.
@@ -360,12 +351,12 @@ proof.
   rnd{2}; rnd{2}; rnd{2}.
   rnd.
   wp.
-  while (={j2, L0}) => /=. wp.
+  while (={j1, L}) => /=. wp.
   + rnd; rnd; rnd => //=.
   + wp => //=.
   wp. rnd; rnd; rnd.
   wp. rnd => /=.
-  while (={j0, i0, VotingScheme.ring_size} /\ size l0_no_i{1} = size l0_no_i{2}).
+  while (={j, i0, VotingScheme.ring_size} /\ size l0_no_i{1} = size l0_no_i{2}).
   + wp => /=.
   + seq 1 1: (#pre).
     + rnd => //.
@@ -374,11 +365,12 @@ proof.
   wp. rnd; rnd.
   wp. rnd.
   wp => /=.
-  (* seq 21 21: (#pre /\ ={r', sk_i, VotingScheme.l0, VotingScheme.g, VotingScheme.pk, LRS.g, LRS.h, LRS.pk} /\ x0{1} = x1{2} /\ y0{1} = y1{2} /\ r2{1} = r3{2} /\ Voter0.behaviour{1} = Voter1.behaviour{2}). *)
-  seq 21 21: (={VotingScheme.l0}).
-  + rnd => /=. wp. rnd => /=. wp. rnd => /=. wp. rnd; rnd; rnd => /=. wp. rnd => //. skip. smt.
-  if => //. admit.
-  wp. rnd; rnd; rnd => /=. skip. admit.
+  seq 21 21: (#pre /\ ={r', sk_i, VotingScheme.l0, VotingScheme.g, VotingScheme.pk, LRS.g, LRS.h, LRS.pk} /\ x0{1} = x1{2} /\ y0{1} = y1{2} /\ r2{1} = r3{2}).
+  + rnd => /=. wp. rnd => /=. wp. rnd => /=. wp. rnd; rnd; rnd => /=. wp. rnd => //.
+  if => //.
+  + wp. skip => //=. admit.
+  wp. rnd; rnd; rnd. skip.
+  admit.
   admit.
 qed.
 end section Games.
