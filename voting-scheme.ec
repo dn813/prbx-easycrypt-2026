@@ -378,7 +378,7 @@ local lemma Games12_indist &m:
   Pr[Game(Voter1, Adversary, VotingScheme).main() @ &m : res] =
   Pr[Game(Voter2, Adversary, VotingScheme).main() @ &m : res].
 proof.
-  byequiv => //.
+  byequiv (_: ={glob Adversary} /\ (glob Voter1){1} = (glob Voter2){2} ==> _) => //.
   proc; inline*; wp.
   rnd. wp.
   while (={j2, L0}) => //=.
@@ -410,9 +410,11 @@ proof.
   wp. rnd; rnd. wp. rnd. wp.
   seq 21 21: (#pre /\ ={r', sk_i, VotingScheme.l0, VotingScheme.g, VotingScheme.pk, LRS.g, LRS.h, LRS.pk} /\ x1{1} = x{2} /\ y1{1} = y{2} /\ r3{1} = r1{2}).
   + rnd => /=. wp. rnd => /=. wp. rnd => /=. wp. rnd; rnd; rnd => /=. wp. rnd => //.
-  + 
-  if => //.
-  + wp. skip => //=.if{1} => //.
+  if{1} => //.
+  + wp. skip => //=.
+  + admit.
+  wp. rnd{1}; rnd{1}; rnd{1}.
+  skip. admit.
   admit.
 qed.
 end section Games.
