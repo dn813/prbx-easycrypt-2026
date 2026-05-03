@@ -281,12 +281,4 @@ module SignEquivalence = {
   }
 }.
 
-(* lemma sign_equiv:
-equiv [LRS.sign ~ SignEquivalence.sign : ={LRS.i, LRS.g, LRS.h, LRS.pk, L, ev, sc_i, m} ==> ={res}].
-proof.
-  proc.
-  wp => /=.
-  while ()  
-*)
-
 
